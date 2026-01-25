@@ -14,4 +14,3 @@ def load_pdf(pdf_path:str)->str:
     doc.close()
     return "/n/n".join(all_text)
 text = load_pdf("hello world.pdf")
-print(text[:1000])
