@@ -7,6 +7,7 @@ from vectorstore.faiss_store import (
     search_index,
     load_faiss_index    
 )
+from retrieval.bm25_store import build_bm25_index, search_bm25
 import os
 import numpy as np 
 
@@ -66,3 +67,16 @@ for rank, (idx, score) in enumerate(zip(indices[0], scores[0]), start=1):
     print("Chunk ID:", chunks[idx]["metadata"]["chunk_id"])
     print("Text:", chunks[idx]["text"][:300], "...")
     print("-" * 50)
+
+bm25, corpus = build_bm25_index(chunks)
+
+results, scores = search_bm25(
+    "Virat Kohli ICC awards 2018",
+    bm25,
+    corpus,
+    chunks,
+    top_k=5
+)
+
+for i, (chunk, score) in enumerate(zip(results, scores), 1):
+    print(i, round(score, 3), chunk["text"][:200])
