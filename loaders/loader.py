@@ -12,5 +12,4 @@ def load_pdf(pdf_path:str)->str:
             if cleaned:
                 all_text.append(cleaned)
     doc.close()
-    return "/n/n".join(all_text)
-text = load_pdf("hello world.pdf")
+    return "\n\n".join(all_text)
