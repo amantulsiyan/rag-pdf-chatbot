@@ -65,7 +65,7 @@ for rank, (idx, score) in enumerate(zip(indices[0], scores[0]), start=1):
     print(f"Rank {rank}")
     print("Score:", round(float(score), 4))
     print("Chunk ID:", chunks[idx]["metadata"]["chunk_id"])
-    print("Text:", chunks[idx]["text"][:300], "...")
+    print("Text:", chunks[idx]["text"], "...")
     print("-" * 50)
 
 bm25, corpus = build_bm25_index(chunks)
@@ -79,4 +79,5 @@ results, scores = search_bm25(
 )
 
 for i, (chunk, score) in enumerate(zip(results, scores), 1):
-    print(i, round(score, 3), chunk["text"][:200])
+    print(i, round(score, 3), chunk["text"])
+    print("-"*50)
