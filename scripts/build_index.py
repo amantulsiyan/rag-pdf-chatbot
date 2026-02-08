@@ -9,7 +9,7 @@ from vectorstore.faiss_store import (
 from retrieval.bm25_store import build_bm25_index
 from retrieval.hybrid_retriever import retrieve_faiss_and_bm25
 from rag.pipeline import run_rag_pipeline
-from llm.dummy_llm import DummyLLM
+from llm.groq_llm import GroqLLM
 import os
 
 
@@ -66,14 +66,14 @@ aligned_results = retrieve_faiss_and_bm25(
 )
 
 # Convert dict → list (simple)
-retrieved_chunks = list(aligned_results.values())
+retrieved_chunks = list(aligned_results)
 
 
 # ---------------- RAG PIPELINE ----------------
 answer = run_rag_pipeline(
     question=query,
     retrieved_chunks=retrieved_chunks,
-    llm_client=DummyLLM()
+    llm_client=GroqLLM()
 )
 
 print("\nFinal Answer:")
