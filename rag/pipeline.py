@@ -1,46 +1,50 @@
 from rag.prompt import build_rag_prompt
+from rag.confidence import compute_confidence
 
 
 def build_context(retrieved_chunks):
     """
     Converts retrieved chunks into a single context string.
     """
-
     context_parts = []
 
     for i, item in enumerate(retrieved_chunks, start=1):
         chunk_text = item["chunk"]["text"]
         context_parts.append(f"Chunk {i}:\n{chunk_text}")
 
-    context = "\n\n".join(context_parts)
-    return context
+    return "\n\n".join(context_parts)
 
 
-def run_rag_pipeline(
-    question: str,
-    retrieved_chunks,
-    llm_client
-):
-    """
-    Runs the RAG pipeline:
-    retrieval output -> context -> prompt -> LLM -> answer
-    """
-
-    # 1. Handle empty retrieval
+def run_rag_pipeline(question, retrieved_chunks, llm_client):
     if not retrieved_chunks:
-        return "No relevant information found in the documents."
+        return {
+            "answer": "I don't know based on the provided context.",
+            "confidence": 0.0,
+            "sources": []
+        }
 
-    # 2. Build context
+    # Extract final scores safely
+    final_scores = [
+        c.get("final_score", 0.0)
+        for c in retrieved_chunks
+        if c.get("final_score") is not None
+    ]
+
+    confidence = compute_confidence(final_scores)
+
     context = build_context(retrieved_chunks)
+    prompt = build_rag_prompt(context=context, question=question)
 
-    # 3. Build prompt
-    prompt = build_rag_prompt(context, question)
-
-    # 4. Call LLM
     answer = llm_client.generate(prompt)
 
-    # 5. Handle refusal / empty answers
-    if not answer or "i don't know" in answer.lower():
-        return "I don't know based on the provided context."
-
-    return answer
+    return {
+        "answer": answer,
+        "confidence": confidence,
+        "sources": [
+            {
+                "chunk_id": c["chunk"]["metadata"]["chunk_id"],
+                "score": c.get("final_score", 0.0)
+            }
+            for c in retrieved_chunks
+        ]
+    }

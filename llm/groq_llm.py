@@ -1,0 +1,23 @@
+import os
+from groq import Groq
+
+
+class GroqLLM:
+    def __init__(self, model_name="llama-3.1-8b-instant"):
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            raise ValueError("GROQ_API_KEY not set in environment variables")
+
+        self.client = Groq(api_key=api_key)
+        self.model_name = model_name
+
+    def generate(self, prompt: str) -> str:
+        response = self.client.chat.completions.create(
+            model=self.model_name,
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.0  # good for RAG
+        )
+
+        return response.choices[0].message.content.strip()

@@ -13,6 +13,6 @@ def save_faiss_index(index, path: str):
 def load_faiss_index(path: str):
     return faiss.read_index(path)
 
-def search_index(index,query_vector:np.ndarray, top_k: int=5):
+def search_index(index,query_vector:np.ndarray, top_k: int):
     return index.search(query_vector, top_k)
 
