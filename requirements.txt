@@ -1,0 +1,22 @@
+# Core
+numpy
+pandas
+
+# PDF processing
+pymupdf
+
+# Embeddings
+sentence-transformers
+torch
+
+# Vector store
+faiss-cpu
+
+# Lexical retrieval
+rank-bm25
+
+# Tokenization
+tiktoken
+
+# LLM API
+groq
