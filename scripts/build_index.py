@@ -36,13 +36,13 @@ print("Embedding chunks...")
 vectors, _ = embed_chunks(chunks)
 
 print("Building FAISS index...")
-index = build_faiss_index(vectors)
+faiss_index = build_faiss_index(vectors)
 
 os.makedirs("vectorstore", exist_ok=True)
-save_faiss_index(index, index_path)
+save_faiss_index(faiss_index, index_path)
 
-index = load_faiss_index(index_path)
-print("FAISS index size:", index.ntotal)
+faiss_index = load_faiss_index(index_path)
+print("FAISS index size:", faiss_index.ntotal)
 
 print("Building BM25 index...")
 bm25, tokenized_corpus = build_bm25_index(chunks)
@@ -61,7 +61,7 @@ query_vector, _ = embed_chunks([{"text": query}])
 # ---------------- HYBRID RETRIEVAL ----------------
 # 1. Align FAISS + BM25
 rows = retrieve_faiss_and_bm25(
-    index=index,
+    index=faiss_index,
     query_vector=query_vector,
     query=query,
     bm25=bm25,
