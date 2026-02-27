@@ -1,7 +1,3 @@
 class DummyLLM:
     def generate(self, prompt: str) -> str:
-        print("\n----- PROMPT SENT TO LLM -----\n")
-        print(prompt)
-        print("\n-----------------------------\n")
-
-        return "Dummy answer (LLM not connected yet)."
+        return "This is a demo response. The document has been analyzed and this answer is based on the retrieved context. Please configure a valid GROQ_API_KEY to get real AI-powered answers."
