@@ -1,9 +1,12 @@
 import os
 from groq import Groq
+from dotenv import load_dotenv
+
+load_dotenv(override=True)
 
 
 class GroqLLM:
-    def __init__(self, model_name="llama-3.1-8b-instant"):
+    def __init__(self, model_name="llama-3.3-70b-versatile"):
         api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
             raise ValueError("GROQ_API_KEY not set in environment variables")
@@ -17,7 +20,8 @@ class GroqLLM:
             messages=[
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.0  # good for RAG
+            temperature=0.0,  # good for RAG
+            max_tokens=300
         )
 
         return response.choices[0].message.content.strip()
