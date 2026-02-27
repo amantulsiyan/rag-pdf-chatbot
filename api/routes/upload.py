@@ -1,4 +1,4 @@
-from fastapi import APIRouter, File, UploadFile, HTTPException
+from fastapi import APIRouter, File, UploadFile, HTTPException, Request
 import shutil
 import os
 from chunking.chunker import chunk_text
@@ -13,7 +13,7 @@ upload_folder = "temp_uploads"
 os.makedirs(upload_folder, exist_ok=True)
 
 @router.post("/upload_pdf")
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(request: Request, file: UploadFile = File(...)):
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files allowed")
 
@@ -32,11 +32,10 @@ async def upload_file(file: UploadFile = File(...)):
     faiss_index = build_faiss_index(vectors)
     bm25_index, tokenised_corpus = build_bm25_index(chunks)
 
-    # Access app state via router
-    router.app.state.chunks = chunks
-    router.app.state.faiss_index = faiss_index
-    router.app.state.bm25_index = bm25_index
-    router.app.state.tokenised_corpus = tokenised_corpus
+    request.app.state.chunks = chunks
+    request.app.state.faiss_index = faiss_index
+    request.app.state.bm25_index = bm25_index
+    request.app.state.tokenised_corpus = tokenised_corpus
 
     return {
         "message": "PDF Indexed Successfully",
