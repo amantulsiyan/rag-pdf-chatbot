@@ -1,5 +1,5 @@
 import tiktoken
-def chunk_text(text,document_id,chunk_size=700,overlap=50,model="gpt-4o"):
+def chunk_text(text,document_id,chunk_size=500,overlap=50,model="gpt-4o"):
     enc=tiktoken.encoding_for_model(model)
     tokens=enc.encode(text)
     chunks=[]
