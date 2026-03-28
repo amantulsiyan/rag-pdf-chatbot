@@ -17,7 +17,7 @@ def compute_confidence(final_scores: list[float]) -> float:
     dominance = (
         scores_sorted[0] - scores_sorted[1]
         if len(scores_sorted) > 1
-        else scores_sorted[0]
+        else 0.0  # No dominance with single chunk
     )
 
     confidence = (
