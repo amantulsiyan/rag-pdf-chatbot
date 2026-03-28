@@ -2,7 +2,7 @@
 
 A **production-grade Retrieval-Augmented Generation (RAG)** system that answers questions from PDF documents using **query rewriting**, **hybrid retrieval (FAISS + BM25)**, **cross-encoder reranking**, **strict grounding**, and **retrieval-based confidence scoring**.
 
-This project is built **from scratch** (no LangChain / LlamaIndex) to ensure full control, explainability, and interview defensibility. I am planning to introduce LangChain prompt templates in the next iteration.
+This project is built **from scratch** (no LangChain / LlamaIndex) to ensure full control, explainability, and interview defensibility.
 
 ---
 
