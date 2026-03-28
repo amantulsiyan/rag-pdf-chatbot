@@ -52,7 +52,7 @@ def normalise_scores(rows):
     return df
 
 
-def calc_final_score(df, alpha=0.6, top_k=3):
+def calc_final_score(df, top_k, alpha=0.6):
     df["final_score"] = (
         alpha * df["faiss_score_norm"]
         + (1 - alpha) * df["bm25_score_norm"]
