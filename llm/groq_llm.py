@@ -25,3 +25,19 @@ class GroqLLM:
         )
 
         return response.choices[0].message.content.strip()
+    
+    def rewrite_query(self, query: str) -> str:
+        prompt=f"""Rewrite the following query to be more clear and specific for document search:
+        Original query:{query}
+        Rewritten Query: """
+        response=self.client.chat.completions.create(
+            model=self.model_name,
+            messages=[
+                {"role":"user",
+                 "content":prompt
+                }
+            ],
+            temperature=0.3,
+            max_tokens=200
+        )
+        return response.choices[0].message.content.strip()
