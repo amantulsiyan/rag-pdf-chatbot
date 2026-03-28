@@ -1,6 +1,7 @@
 from loaders.loader import load_pdf
 from chunking.chunker import chunk_text
 from embeddings.embedder import embed_chunks
+from embeddings.re_ranker import reranker
 from vectorstore.faiss_store import (
     build_faiss_index,
     save_faiss_index,
@@ -21,7 +22,8 @@ import os
 pdf_path = r"C:\Users\USER\Desktop\Engineering\ML Projects\RAG PDF Chatbot\Hello_world.pdf"
 doc_id = "doc_1"
 index_path = "vectorstore/index.faiss"
-top_k = 7
+top_k = 15
+reranked_k_chunks=5
 
 
 # ---------------- BUILD INDEX ----------------
@@ -52,7 +54,7 @@ print("-" * 60)
 
 
 # ---------------- QUERY ----------------
-query = "In which season of the IPL, did Virat Kohli win the orange cap?"
+query = "What is the name of virat kohli's spouse?"
 print("Query:", query)
 
 query_vector, _ = embed_chunks([{"text": query}])
@@ -76,15 +78,16 @@ df = normalise_scores(rows)
 # 3. Compute hybrid final score + rank
 retrieved_chunks = calc_final_score(
     df,
+    top_k=top_k,
     alpha=0.6,
-    top_k=top_k
 )
 
+reranked_chunks=reranker(query, retrieved_chunks, actual_top_k=reranked_k_chunks)
 
 # ---------------- RAG PIPELINE ----------------
 result = run_rag_pipeline(
     question=query,
-    retrieved_chunks=retrieved_chunks,
+    reranked_chunks=reranked_chunks,
     llm_client=GroqLLM()
 )
 
