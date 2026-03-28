@@ -15,8 +15,8 @@ def build_context(retrieved_chunks):
     return "\n\n".join(context_parts)
 
 
-def run_rag_pipeline(question, retrieved_chunks, llm_client):
-    if not retrieved_chunks:
+def run_rag_pipeline(question, reranked_chunks, llm_client):
+    if not reranked_chunks:
         return {
             "answer": "I don't know based on the provided context.",
             "confidence": 0.0,
@@ -24,15 +24,15 @@ def run_rag_pipeline(question, retrieved_chunks, llm_client):
         }
 
     # Extract final scores safely
-    final_scores = [
-        c.get("final_score", 0.0)
-        for c in retrieved_chunks
-        if c.get("final_score") is not None
+    re_rank_scores = [
+        c.get("rerank_score", 0.0)
+        for c in reranked_chunks
+        if c.get("rerank_score") is not None
     ]
 
-    confidence = compute_confidence(final_scores)
+    confidence = compute_confidence(re_rank_scores)
 
-    context = build_context(retrieved_chunks)
+    context = build_context(reranked_chunks)
     prompt = build_rag_prompt(context=context, question=question)
 
     answer = llm_client.generate(prompt)
@@ -43,8 +43,8 @@ def run_rag_pipeline(question, retrieved_chunks, llm_client):
         "sources": [
             {
                 "chunk_id": c["chunk"]["metadata"]["chunk_id"],
-                "score": c.get("final_score", 0.0)
+                "score": c.get("rerank_score", 0.0)
             }
-            for c in retrieved_chunks
+            for c in reranked_chunks
         ]
     }
