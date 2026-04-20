@@ -104,7 +104,7 @@ async function sendQuestion() {
         removeLoadingMessage(loadingId);
 
         if (response.ok) {
-            addMessage(data.answer, 'bot', data.confidence, data.sources);
+            addMessage(data.answer, 'bot', data.confidence, data.sources, data.confidence_breakdown);
         } else {
             throw new Error(data.detail || 'Query failed');
         }
@@ -114,7 +114,7 @@ async function sendQuestion() {
     }
 }
 
-function addMessage(text, type, confidence = null, sources = null) {
+function addMessage(text, type, confidence = null, sources = null, breakdown = null) {
     const messagesDiv = document.getElementById('messages');
     const welcomeMsg = messagesDiv.querySelector('.welcome-message');
     if (welcomeMsg) welcomeMsg.remove();
@@ -132,10 +132,116 @@ function addMessage(text, type, confidence = null, sources = null) {
         badge.textContent = `Confidence: ${(confidence * 100).toFixed(0)}%`;
         contentDiv.appendChild(badge);
 
+        // Add confidence breakdown
+        if (breakdown) {
+            const breakdownDiv = document.createElement('div');
+            breakdownDiv.className = 'confidence-breakdown';
+            
+            const breakdownHeader = document.createElement('div');
+            breakdownHeader.className = 'breakdown-header';
+            breakdownHeader.onclick = function() { this.parentElement.classList.toggle('expanded'); };
+            
+            const headerText = document.createTextNode('📊 Confidence Breakdown ');
+            breakdownHeader.appendChild(headerText);
+            
+            const infoIcon = document.createElement('span');
+            infoIcon.className = 'formula-info';
+            infoIcon.textContent = 'i';
+            infoIcon.title = 'Click to see formula details';
+            infoIcon.onclick = function(e) { 
+                e.stopPropagation(); 
+                toggleFormulaModal(); 
+            };
+            breakdownHeader.appendChild(infoIcon);
+            
+            const toggleIcon = document.createElement('span');
+            toggleIcon.className = 'toggle-icon';
+            toggleIcon.textContent = '▼';
+            breakdownHeader.appendChild(toggleIcon);
+            
+            const breakdownContent = document.createElement('div');
+            breakdownContent.className = 'breakdown-content';
+            breakdownContent.innerHTML = `
+                    <div class="breakdown-item">
+                        <div class="breakdown-label">
+                            <span>Mean Relevance</span>
+                            <span class="breakdown-weight">(50% weight)</span>
+                        </div>
+                        <div class="breakdown-bar-container">
+                            <div class="breakdown-bar" style="width: ${(breakdown.mean_score * 100).toFixed(0)}%"></div>
+                        </div>
+                        <span class="breakdown-value">${(breakdown.mean_score * 100).toFixed(0)}%</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <div class="breakdown-label">
+                            <span>Agreement</span>
+                            <span class="breakdown-weight">(30% weight)</span>
+                        </div>
+                        <div class="breakdown-bar-container">
+                            <div class="breakdown-bar" style="width: ${(breakdown.agreement * 100).toFixed(0)}%"></div>
+                        </div>
+                        <span class="breakdown-value">${(breakdown.agreement * 100).toFixed(0)}%</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <div class="breakdown-label">
+                            <span>Dominance</span>
+                            <span class="breakdown-weight">(20% weight)</span>
+                        </div>
+                        <div class="breakdown-bar-container">
+                            <div class="breakdown-bar" style="width: ${(breakdown.dominance * 100).toFixed(0)}%"></div>
+                        </div>
+                        <span class="breakdown-value">${(breakdown.dominance * 100).toFixed(0)}%</span>
+                    </div>
+                    <div class="breakdown-explanation">
+                        ${getConfidenceExplanation(breakdown)}
+                    </div>
+                    <div class="breakdown-calculation">
+                        <strong>Final Calculation:</strong><br>
+                        ${(breakdown.mean_score * 100).toFixed(1)}% × 0.5 + 
+                        ${(breakdown.agreement * 100).toFixed(1)}% × 0.3 + 
+                        ${(breakdown.dominance * 100).toFixed(1)}% × 0.2 = 
+                        <strong>${(confidence * 100).toFixed(0)}%</strong>
+                    </div>
+            `;
+            
+            breakdownDiv.appendChild(breakdownHeader);
+            breakdownDiv.appendChild(breakdownContent);
+            contentDiv.appendChild(breakdownDiv);
+        }
+
         if (sources && sources.length > 0) {
             const sourcesDiv = document.createElement('div');
-            sourcesDiv.className = 'sources';
-            sourcesDiv.textContent = `📚 Sources: ${sources.length} chunks`;
+            sourcesDiv.className = 'sources-container';
+            
+            const sourcesHeader = document.createElement('div');
+            sourcesHeader.className = 'sources-header';
+            sourcesHeader.onclick = () => sourcesDiv.classList.toggle('expanded');
+            sourcesHeader.innerHTML = `📚 Sources: ${sources.length} chunks <span class="toggle-icon">▼</span>`;
+            
+            const sourcesList = document.createElement('div');
+            sourcesList.className = 'sources-list';
+            sources.forEach((source, idx) => {
+                const sourceItem = document.createElement('div');
+                sourceItem.className = 'source-item';
+                sourceItem.innerHTML = `
+                    <span class="source-rank">#${idx + 1}</span>
+                    <span class="source-id">${source.chunk_id}</span>
+                    <span class="source-score">${(source.score * 100).toFixed(1)}%</span>
+                    <button class="view-chunk-btn" title="View chunk text">👁️</button>
+                `;
+                
+                // Add click handler for view button
+                const viewBtn = sourceItem.querySelector('.view-chunk-btn');
+                viewBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    showChunkModal(source.text, source.chunk_id, source.score);
+                };
+                
+                sourcesList.appendChild(sourceItem);
+            });
+            
+            sourcesDiv.appendChild(sourcesHeader);
+            sourcesDiv.appendChild(sourcesList);
             contentDiv.appendChild(sourcesDiv);
         }
     }
@@ -143,6 +249,26 @@ function addMessage(text, type, confidence = null, sources = null) {
     messageDiv.appendChild(contentDiv);
     messagesDiv.appendChild(messageDiv);
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
+
+function getConfidenceExplanation(breakdown) {
+    const mean = breakdown.mean_score;
+    const agreement = breakdown.agreement;
+    const dominance = breakdown.dominance;
+    
+    if (mean < 0.3) {
+        return "⚠️ Low confidence: Retrieved chunks have weak relevance to the query.";
+    } else if (agreement < 0.5) {
+        return "⚠️ Low confidence: High disagreement between retrieved chunks (conflicting information).";
+    } else if (dominance < 0.2 && mean < 0.6) {
+        return "⚠️ Moderate confidence: No single chunk clearly dominates, evidence is distributed.";
+    } else if (mean >= 0.65 && dominance >= 0.3) {
+        return "✅ High confidence: Strong relevance with a clear best match.";
+    } else if (mean >= 0.6) {
+        return "✅ Good confidence: Multiple relevant chunks support the answer.";
+    } else {
+        return "ℹ️ Moderate confidence: Reasonable relevance but some uncertainty remains.";
+    }
 }
 
 function addLoadingMessage() {
@@ -186,4 +312,144 @@ function resetApp() {
     document.getElementById('uploadProgress').style.display = 'none';
     document.getElementById('uploadStatus').textContent = '';
     document.getElementById('fileInput').value = '';
+}
+
+function toggleFormulaModal() {
+    const modal = document.getElementById('formulaModal');
+    if (!modal) {
+        createFormulaModal();
+    } else {
+        modal.style.display = modal.style.display === 'flex' ? 'none' : 'flex';
+    }
+}
+
+function createFormulaModal() {
+    const modal = document.createElement('div');
+    modal.id = 'formulaModal';
+    modal.className = 'formula-modal';
+    modal.innerHTML = `
+        <div class="formula-modal-content">
+            <div class="formula-modal-header">
+                <h3>🧮 Confidence Scoring Formula</h3>
+                <span class="formula-close" onclick="toggleFormulaModal()">×</span>
+            </div>
+            <div class="formula-modal-body">
+                <div class="formula-section">
+                    <h4>Core Formula</h4>
+                    <div class="formula-box">
+                        Confidence = 0.5 × Mean Score + 0.3 × Agreement + 0.2 × Dominance
+                    </div>
+                </div>
+
+                <div class="formula-section">
+                    <h4>Component Breakdown</h4>
+                    
+                    <div class="formula-component">
+                        <strong>1. Mean Relevance Score (50% weight)</strong>
+                        <p>Average reranking score from cross-encoder model (ms-marco-MiniLM-L-6-v2)</p>
+                        <ul>
+                            <li>Measures: How relevant are retrieved chunks to the query?</li>
+                            <li>Range: 0.0 (irrelevant) to 1.0 (highly relevant)</li>
+                            <li>Low value means: Weak retrieval, chunks don't match query well</li>
+                        </ul>
+                    </div>
+
+                    <div class="formula-component">
+                        <strong>2. Agreement (30% weight)</strong>
+                        <p>Formula: 1 / (1 + variance)</p>
+                        <ul>
+                            <li>Measures: Do all chunks agree (similar scores)?</li>
+                            <li>Range: 0.0 (high disagreement) to 1.0 (perfect agreement)</li>
+                            <li>Low value means: Conflicting evidence, inconsistent chunk quality</li>
+                        </ul>
+                    </div>
+
+                    <div class="formula-component">
+                        <strong>3. Dominance (20% weight)</strong>
+                        <p>Formula: Top Score - Second Score</p>
+                        <ul>
+                            <li>Measures: Is there a clear "best" chunk?</li>
+                            <li>Range: 0.0 (no clear winner) to 1.0 (dominant chunk)</li>
+                            <li>Low value means: Evidence is distributed, no single authoritative source</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="formula-section">
+                    <h4>Why This Design?</h4>
+                    <ul>
+                        <li><strong>Retrieval-based:</strong> Confidence comes from reranker scores, NOT LLM self-assessment</li>
+                        <li><strong>Honest uncertainty:</strong> Low scores trigger "I don't know" responses</li>
+                        <li><strong>Explainable:</strong> Each component reveals WHY confidence is high/low</li>
+                        <li><strong>Hallucination control:</strong> Prevents fluent but incorrect answers</li>
+                    </ul>
+                </div>
+
+                <div class="formula-section">
+                    <h4>Example Scenarios</h4>
+                    <div class="formula-example">
+                        <strong>High Confidence (75%):</strong> Mean=0.8, Agreement=0.9, Dominance=0.5<br>
+                        → Strong retrieval + chunks agree + clear best match
+                    </div>
+                    <div class="formula-example">
+                        <strong>Low Confidence (32%):</strong> Mean=0.25, Agreement=0.85, Dominance=0.1<br>
+                        → Weak retrieval despite agreement, no dominant chunk
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
+    
+    // Close on outside click
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) toggleFormulaModal();
+    });
+}
+
+function showChunkModal(text, chunkId, score) {
+    // Remove existing chunk modal if any
+    const existingModal = document.getElementById('chunkModal');
+    if (existingModal) existingModal.remove();
+    
+    const modal = document.createElement('div');
+    modal.id = 'chunkModal';
+    modal.className = 'chunk-modal';
+    modal.innerHTML = `
+        <div class="chunk-modal-content">
+            <div class="chunk-modal-header">
+                <h3>📝 Chunk Preview</h3>
+                <span class="chunk-modal-close" onclick="closeChunkModal()">×</span>
+            </div>
+            <div class="chunk-modal-body">
+                <div class="chunk-info">
+                    <div class="chunk-info-item">
+                        <strong>Chunk ID:</strong> ${chunkId}
+                    </div>
+                    <div class="chunk-info-item">
+                        <strong>Relevance Score:</strong> 
+                        <span class="chunk-score-badge">${(score * 100).toFixed(1)}%</span>
+                    </div>
+                </div>
+                <div class="chunk-text-container">
+                    <div class="chunk-text-label">Chunk Text:</div>
+                    <div class="chunk-text">${text}</div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
+    
+    // Close on outside click
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeChunkModal();
+    });
+}
+
+function closeChunkModal() {
+    const modal = document.getElementById('chunkModal');
+    if (modal) modal.remove();
 }
