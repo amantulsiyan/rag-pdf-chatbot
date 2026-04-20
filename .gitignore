@@ -19,3 +19,8 @@ data/
 .env
 
 temp_uploads/
+
+# Test results
+test_results/
+*.json
+*.txt
