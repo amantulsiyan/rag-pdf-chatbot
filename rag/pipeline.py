@@ -20,7 +20,13 @@ def run_rag_pipeline(question, reranked_chunks, llm_client):
         return {
             "answer": "I don't know based on the provided context.",
             "confidence": 0.0,
-            "sources": []
+            "sources": [],
+            "confidence_breakdown": {
+                "mean_score": 0.0,
+                "agreement": 0.0,
+                "dominance": 0.0,
+                "variance": 0.0
+            }
         }
 
     # Extract final scores safely
@@ -30,7 +36,7 @@ def run_rag_pipeline(question, reranked_chunks, llm_client):
         if c.get("rerank_score") is not None
     ]
 
-    confidence = compute_confidence(re_rank_scores)
+    confidence, breakdown = compute_confidence(re_rank_scores)
 
     context = build_context(reranked_chunks)
     prompt = build_rag_prompt(context=context, question=question)
@@ -40,10 +46,12 @@ def run_rag_pipeline(question, reranked_chunks, llm_client):
     return {
         "answer": answer,
         "confidence": confidence,
+        "confidence_breakdown": breakdown,
         "sources": [
             {
                 "chunk_id": c["chunk"]["metadata"]["chunk_id"],
-                "score": c.get("rerank_score", 0.0)
+                "score": c.get("rerank_score", 0.0),
+                "text": c["chunk"]["text"]
             }
             for c in reranked_chunks
         ]
