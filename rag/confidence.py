@@ -1,11 +1,11 @@
 import numpy as np
 
 
-def compute_confidence(final_scores: list[float]) -> float:
+def compute_confidence(final_scores: list[float]):
     final_scores = [s for s in final_scores if not np.isnan(s)]
 
     if not final_scores:
-        return 0.0
+        return 0.0, {"mean_score": 0.0, "agreement": 0.0, "dominance": 0.0, "variance": 0.0}
 
     scores = np.array(final_scores)
 
@@ -26,4 +26,11 @@ def compute_confidence(final_scores: list[float]) -> float:
         + 0.2 * dominance
     )
 
-    return round(float(np.clip(confidence, 0.0, 1.0)), 5)
+    breakdown = {
+        "mean_score": round(float(mean_score), 4),
+        "agreement": round(float(agreement), 4),
+        "dominance": round(float(dominance), 4),
+        "variance": round(float(variance), 4)
+    }
+
+    return round(float(np.clip(confidence, 0.0, 1.0)), 5), breakdown
