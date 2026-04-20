@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Request
 from embeddings.embedder import embed_chunks
 from embeddings.re_ranker import reranker
 from retrieval.hybrid_retriever import (
-    retrieve_faiss_and_bm25,
+    retrieve_hybrid,
     normalise_scores,
     calc_final_score
 )
@@ -21,10 +21,10 @@ async def ask_question(request: Request, question_req: QuestionRequest):
     
     rewritten_query = llm_client.rewrite_query(question_req.question)
 
-    query_vector, _ = embed_chunks([{"text": rewritten_query}])
+    query_vector = embed_chunks([{"text": rewritten_query}])
 
-    rows = retrieve_faiss_and_bm25(
-        index=request.app.state.faiss_index,
+    rows = retrieve_hybrid(
+        faiss_index=request.app.state.faiss_index,
         query_vector=query_vector,
         query=rewritten_query,
         bm25=request.app.state.bm25_index,
@@ -48,5 +48,5 @@ async def ask_question(request: Request, question_req: QuestionRequest):
         reranked_chunks=reranked_chunks,
         llm_client=llm_client
     )
-
+    
     return result
