@@ -27,7 +27,7 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
     doc_id = "uploaded_doc"
     chunks, _ = chunk_text(text, document_id=doc_id)
 
-    vectors, _ = embed_chunks(chunks)
+    vectors = embed_chunks(chunks)
 
     faiss_index = build_faiss_index(vectors)
     bm25_index, tokenised_corpus = build_bm25_index(chunks)
