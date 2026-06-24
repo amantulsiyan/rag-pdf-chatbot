@@ -6,6 +6,6 @@ def initialize_app(app: FastAPI):
     app.state.faiss_index = None
     app.state.bm25_index = None
     app.state.tokenised_corpus = None
-    app.state.top_k=15
+    app.state.top_k=8
     app.state.reranked_k_chunks=5
     app.state.llm = GroqLLM()
