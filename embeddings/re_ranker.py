@@ -4,7 +4,7 @@ _model=None
 def _get_model():
     global _model
     if _model is None:
-        _model=CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
+        _model=CrossEncoder("BAAI/bge-reranker-base")
     return _model
 def reranker(query, hits, actual_top_k):
     model=_get_model()
