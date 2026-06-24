@@ -22,10 +22,10 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    text = load_pdf(file_path)
+    text, page_metadata = load_pdf(file_path)
 
-    doc_id = "uploaded_doc"
-    chunks, _ = chunk_text(text, document_id=doc_id)
+    doc_id = file.filename.replace(".pdf","")
+    chunks, _ = chunk_text(text, document_id = doc_id)
 
     vectors = embed_chunks(chunks)
 
