@@ -17,6 +17,13 @@ rank-bm25
 
 # Tokenization
 tiktoken
+nltk
 
 # LLM API
 groq
+
+#database
+psycopg2-binary==2.9.10
+
+#Universally Unique Identifier
+uuid
