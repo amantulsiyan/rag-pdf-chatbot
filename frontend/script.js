@@ -104,7 +104,7 @@ async function sendQuestion() {
         removeLoadingMessage(loadingId);
 
         if (response.ok) {
-            addMessage(data.answer, 'bot', data.confidence, data.sources, data.confidence_breakdown);
+            addMessage(data.answer, 'bot', data.confidence, data.sources, data.confidence_breakdown, data.latency_breakdown);
         } else {
             throw new Error(data.detail || 'Query failed');
         }
@@ -114,7 +114,7 @@ async function sendQuestion() {
     }
 }
 
-function addMessage(text, type, confidence = null, sources = null, breakdown = null) {
+function addMessage(text, type, confidence = null, sources = null, breakdown = null, latency_breakdown = null) {
     const messagesDiv = document.getElementById('messages');
     const welcomeMsg = messagesDiv.querySelector('.welcome-message');
     if (welcomeMsg) welcomeMsg.remove();
@@ -131,6 +131,79 @@ function addMessage(text, type, confidence = null, sources = null, breakdown = n
         badge.className = `confidence-badge ${getConfidenceClass(confidence)}`;
         badge.textContent = `Confidence: ${(confidence * 100).toFixed(0)}%`;
         contentDiv.appendChild(badge);
+
+        // Add latency badge and breakdown
+        if (latency_breakdown !== null) {
+            const latencyBadge = document.createElement('div');
+            latencyBadge.className = 'latency-badge';
+            latencyBadge.textContent = `⚡ ${Math.round(latency_breakdown.total_ms)}ms`;
+            contentDiv.appendChild(latencyBadge);
+
+            // Add latency breakdown
+            const latencyBreakdownDiv = document.createElement('div');
+            latencyBreakdownDiv.className = 'latency-breakdown';
+            
+            const latencyHeader = document.createElement('div');
+            latencyHeader.className = 'breakdown-header';
+            latencyHeader.onclick = function() { this.parentElement.classList.toggle('expanded'); };
+            latencyHeader.innerHTML = '⚡ Latency Breakdown <span class="toggle-icon">▼</span>';
+            
+            const latencyContent = document.createElement('div');
+            latencyContent.className = 'breakdown-content';
+            
+            const stages = [
+                { key: 'query_rewriting_ms', label: 'Query Rewriting' },
+                { key: 'embedding_ms', label: 'Embedding' },
+                { key: 'hybrid_retrieval_ms', label: 'Hybrid Retrieval' },
+                { key: 'normalisation_ms', label: 'Normalisation' },
+                { key: 'calculation_ms', label: 'Score Calculation' },
+                { key: 'reranking_ms', label: 'Reranking' },
+                { key: 'generation_ms', label: 'LLM Generation' }
+            ];
+
+            stages.forEach(stage => {
+                const value = latency_breakdown[stage.key];
+                const percentage = (value / latency_breakdown.total_ms * 100).toFixed(1);
+                
+                const item = document.createElement('div');
+                item.className = 'breakdown-item';
+                
+                const labelDiv = document.createElement('div');
+                labelDiv.className = 'breakdown-label';
+                labelDiv.innerHTML = `<span>${stage.label}</span>`;
+                
+                const barContainer = document.createElement('div');
+                barContainer.className = 'breakdown-bar-container';
+                
+                const bar = document.createElement('div');
+                bar.className = 'breakdown-bar';
+                bar.style.width = `${percentage}%`;
+                
+                // Color code by speed: green (<100ms), yellow (100-300ms), red (>300ms)
+                if (value < 100) {
+                    bar.style.backgroundColor = '#10b981';
+                } else if (value < 300) {
+                    bar.style.backgroundColor = '#f59e0b';
+                } else {
+                    bar.style.backgroundColor = '#ef4444';
+                }
+                
+                barContainer.appendChild(bar);
+                
+                const valueSpan = document.createElement('span');
+                valueSpan.className = 'breakdown-value';
+                valueSpan.textContent = `${Math.round(value)}ms (${percentage}%)`;
+                
+                item.appendChild(labelDiv);
+                item.appendChild(barContainer);
+                item.appendChild(valueSpan);
+                latencyContent.appendChild(item);
+            });
+            
+            latencyBreakdownDiv.appendChild(latencyHeader);
+            latencyBreakdownDiv.appendChild(latencyContent);
+            contentDiv.appendChild(latencyBreakdownDiv);
+        }
 
         // Add confidence breakdown
         if (breakdown) {
