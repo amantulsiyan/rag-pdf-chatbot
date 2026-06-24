@@ -21,6 +21,8 @@ This project is built **from scratch** (no LangChain / LlamaIndex) to ensure ful
 - 🛑 **Hallucination control** via strict prompting
 - 🌐 **FastAPI backend** with REST endpoints
 - 💻 **Web frontend** for interactive querying
+- 🗄️ **PostgreSQL observability** for request tracing and telemetry
+- ⚡ **Latency instrumentation** across all pipeline stages
 
 ---
 
@@ -44,17 +46,17 @@ PDF
  ↓
 Text Extraction (PyMuPDF)
  ↓
-Chunking (TikToken, size=500, overlap=50)
+Chunking (Sentence-Aware, size=250 tokens, overlap=30)
  ↓
 Embeddings (all-MiniLM-L6-v2)
  ↓
 User Query → Query Rewriting (LLM)
  ↓
 FAISS Index ─┐
-             ├─ Hybrid Retriever (α=0.6) ─→ Top-15 Chunks
+             ├─ Hybrid Retriever (α=0.6) ─→ Top-8 Chunks
 BM25 Index ──┘
  ↓
-Cross-Encoder Reranking (ms-marco-MiniLM-L-6-v2) → Top-5 Chunks
+Cross-Encoder Reranking (BAAI/bge-reranker-base) → Top-5 Chunks
  ↓
 RAG Prompt Builder (Strict Context-Only)
  ↓
@@ -88,7 +90,7 @@ rag-pdf-chatbot/
 │
 ├── embeddings/
 │   ├── embedder.py         # Chunks → dense vectors (all-MiniLM-L6-v2)
-│   └── re_ranker.py        # Cross-encoder reranking (ms-marco-MiniLM)
+│   └── re_ranker.py        # Cross-encoder reranking (BAAI/bge-reranker-base)
 │
 ├── vectorstore/
 │   └── faiss_store.py      # FAISS index build / load / search
@@ -100,10 +102,17 @@ rag-pdf-chatbot/
 ├── rag/
 │   ├── prompt.py           # Strict RAG prompt
 │   ├── pipeline.py         # Retrieval → reranking → generation
-│   └── confidence.py       # Rerank-based confidence scoring
+│   ├── confidence.py       # Rerank-based confidence scoring
+│   └── latency.py          # Latency instrumentation utility
 │
 ├── llm/
 │   └── groq_llm.py         # Groq LLaMA-3 + query rewriting
+│
+├── eval/
+│   └── eval_loop.py        # Automated evaluation with metrics
+│
+├── logger/
+│   └── logger.py           # PostgreSQL observability logger
 │
 ├── scripts/
 │   └── build_index.py      # End-to-end runner (index + query)
@@ -135,11 +144,11 @@ Scores are normalized and combined as:
 ```text
 final_score = α · faiss_score_norm + (1 − α) · bm25_score_norm
 ```
-Default: α = 0.6, retrieves top-15 chunks
+Default: α = 0.6, retrieves top-8 chunks
 
 ### 5. Cross-Encoder Reranking
 
-Hybrid results are reranked using `cross-encoder/ms-marco-MiniLM-L-6-v2`
+Hybrid results are reranked using `BAAI/bge-reranker-base`
 
 Computes query-chunk relevance scores with sigmoid normalization
 
