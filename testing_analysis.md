@@ -285,3 +285,12 @@ The project now incorporates:
 The experiments also highlight a critical real-world lesson in RAG engineering:
 
 “Improving retrieval quality is necessary, but not sufficient. End-to-end RAG performance depends on retrieval, reranking, generation, prompting, and evaluation working together as a complete system.”
+git add TESTING_GUIDE.md
+git commit -m "docs: add comprehensive testing guide for RAG system
+
+- Document quick start commands for running test suites
+- Define 14 test categories with expected behaviors and difficulty levels
+- Provide debugging checklist and common failure mode analysis
+- Include success criteria for minimum viable and excellent performance
+- Add troubleshooting guidelines for hallucination, retrieval, and confidence issues
+- Document expected confidence ranges and system behaviors per category"
