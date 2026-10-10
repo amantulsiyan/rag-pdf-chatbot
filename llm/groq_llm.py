@@ -7,7 +7,7 @@ load_dotenv(override=True)
 
 
 class GroqLLM:
-    def __init__(self, model_name="llama-3.3-70b-versatile"):
+    def __init__(self, model_name="openai/gpt-oss-120b"):
         api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
             raise ValueError("GROQ_API_KEY not set in environment variables")
