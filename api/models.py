@@ -1,5 +1,14 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field
 from typing import List, Dict
+from uuid import UUID
+
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8, max_length =128)
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
 
 class SourceModel(BaseModel):
     chunk_id: str
@@ -30,3 +39,4 @@ class AskResponse(BaseModel):
 
 class QuestionRequest(BaseModel):
     question: str
+    document_id: UUID
