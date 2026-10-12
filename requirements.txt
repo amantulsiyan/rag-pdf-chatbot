@@ -1,7 +1,11 @@
 # Core
 numpy
 pandas
-
+dotenv
+email-validator
+uvicorn
+fastapi
+python-multipart
 # PDF processing
 pymupdf
 
