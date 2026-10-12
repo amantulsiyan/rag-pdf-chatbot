@@ -1,8 +1,10 @@
-import nltk
 import tiktoken
-
-nltk.download('punkt')
-
+import nltk
+try:
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    nltk.download('punkt')
+    
 def chunk_text(
     text,
     document_id,
