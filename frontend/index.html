@@ -13,8 +13,52 @@
             <p class="subtitle">Hybrid Retrieval-Augmented Generation System</p>
         </header>
 
-        <div class="main-content">
-            <div class="upload-section" id="uploadSection">
+        <!-- Auth Section -->
+        <div class="main-content" id="authSection">
+            <div class="auth-container">
+                <div class="auth-tabs">
+                    <button class="auth-tab active" onclick="switchTab('login')">Login</button>
+                    <button class="auth-tab" onclick="switchTab('register')">Register</button>
+                </div>
+
+                <div id="loginForm" class="auth-form">
+                    <h2>Welcome Back</h2>
+                    <input type="email" id="loginEmail" placeholder="Email" class="auth-input">
+                    <input type="password" id="loginPassword" placeholder="Password" class="auth-input">
+                    <button class="btn-primary" onclick="login()">Login</button>
+                    <div id="loginStatus" class="status-message"></div>
+                </div>
+
+                <div id="registerForm" class="auth-form" style="display:none">
+                    <h2>Create Account</h2>
+                    <input type="email" id="registerEmail" placeholder="Email" class="auth-input">
+                    <input type="password" id="registerPassword" placeholder="Password (min 8 chars)" class="auth-input">
+                    <button class="btn-primary" onclick="register()">Register</button>
+                    <div id="registerStatus" class="status-message"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-content" id="appSection" style="display:none">
+            <div class="app-header">
+                <span id="userEmail" class="user-email"></span>
+                <button class="btn-secondary" onclick="logout()">Logout</button>
+            </div>
+
+            <div class="app-body">
+                <!-- Documents Sidebar -->
+                <div class="sidebar" id="sidebar">
+                    <div class="sidebar-header">
+                        <span>📂 My Documents</span>
+                        <button class="btn-icon" onclick="loadDocuments()" title="Refresh">🔄</button>
+                    </div>
+                    <div id="documentsList" class="documents-list"></div>
+                    <button class="btn-upload-new" onclick="showUploadPanel()">+ Upload New PDF</button>
+                </div>
+
+        <div class="main-panel">
+        <div class="main-content-inner">
+        <div class="upload-section" id="uploadSection">
                 <div class="upload-card">
                     <div class="upload-icon">📤</div>
                     <h2>Upload Your PDF</h2>
@@ -62,6 +106,9 @@
                 </div>
             </div>
         </div>
+        </div> <!-- main-panel -->
+        </div> <!-- app-body -->
+        </div> <!-- appSection -->
     </div>
 
     <script src="script.js"></script>
