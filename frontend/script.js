@@ -7,10 +7,25 @@ let authToken = localStorage.getItem('token') || null;
 // ─── Boot ────────────────────────────────────────────────────────────────────
 
 if (authToken) {
-    showApp();
+    validateTokenAndBoot();
 } else {
     document.getElementById('authSection').style.display = 'block';
     document.getElementById('appSection').style.display = 'none';
+}
+
+async function validateTokenAndBoot() {
+    try {
+        const res  = await fetch(`${API_BASE}/me`, { headers: authHeaders() });
+        if (!res.ok) throw new Error('invalid');
+        const data = await res.json();
+        document.getElementById('userEmail').textContent = data.user?.email || '';
+        showApp();
+    } catch (_) {
+        authToken = null;
+        localStorage.removeItem('token');
+        document.getElementById('authSection').style.display = 'block';
+        document.getElementById('appSection').style.display = 'none';
+    }
 }
 
 document.getElementById('fileInput').addEventListener('change', handleFileSelect);
@@ -51,7 +66,7 @@ async function login() {
 
         authToken = data.access_token;
         localStorage.setItem('token', authToken);
-        showApp();
+        await validateTokenAndBoot();
     } catch (err) {
         status.textContent = `✗ ${err.message}`; status.className = 'status-message error';
     }
@@ -96,13 +111,6 @@ function logout() {
 async function showApp() {
     document.getElementById('authSection').style.display = 'none';
     document.getElementById('appSection').style.display  = 'block';
-
-    try {
-        const res  = await fetch(`${API_BASE}/me`, { headers: authHeaders() });
-        const data = await res.json();
-        if (res.ok) document.getElementById('userEmail').textContent = data.user?.email || '';
-    } catch (_) {}
-
     loadDocuments();
     showUploadPanel();
 }
