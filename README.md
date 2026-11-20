@@ -330,15 +330,43 @@ All four logging functions catch exceptions silently to avoid failing the user-f
 |---|---|---|
 | `GROQ_API_KEY` | Groq API key for LLM query rewriting and answer generation | Yes |
 | `DB_PASSWORD` | Password for the local PostgreSQL `postgres` user | Yes |
+| `DB_HOST` | PostgreSQL host (`db` in Docker Compose, `localhost` locally) | No |
+| `DB_PORT` | PostgreSQL port | No |
+| `DB_NAME` | PostgreSQL database name | No |
+| `DB_USER` | PostgreSQL user | No |
 | `JWT_SECRET_KEY` | Secret used to sign and verify JWT access tokens | Yes |
 | `JWT_ALGORITHM` | JWT signing algorithm (default: `HS256`) | No |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | JWT expiry in minutes (default: `30`) | No |
 
-The database connection is hardcoded to `host=localhost`, `port=5432`, `dbname=rag_db`, `user=postgres`. These values are not configurable via environment variables in the current implementation.
+Database settings default to `host=localhost`, `port=5432`, `dbname=rag_db`, and
+`user=postgres` when the corresponding variables are absent.
 
 ---
 
 ## Running the Application
+
+### Docker Compose
+
+1. Create `.env` from `.env.example` and replace every placeholder value.
+2. Start the complete application:
+   ```bash
+   docker compose up --build
+   ```
+
+The frontend is available at `http://localhost:8080`, the API at
+`http://localhost:8000`, and interactive API documentation at
+`http://localhost:8000/docs`. PostgreSQL data, uploaded PDFs, and downloaded
+model files are stored in named Docker volumes.
+
+To stop the containers without deleting data, run:
+```bash
+docker compose down
+```
+
+To reset all Docker-managed application data, run:
+```bash
+docker compose down -v
+```
 
 ### API Server
 
