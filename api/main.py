@@ -1,17 +1,105 @@
+
+import os
 import time
 import math
+import uuid
+import logging
 
-from collections import deque
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
+from redis.asyncio import Redis
+from redis.exceptions import RedisError
+
 from api.dependencies import initialize_app
 from api.routes import upload, query, auth_routes
 
 
-app = FastAPI(title="RAG PDF API")
+logger = logging.getLogger(__name__)
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Rate-limiting configuration
+RATE_LIMIT = int(os.getenv("RATE_LIMIT", "5"))
+WINDOW_SIZE = int(os.getenv("WINDOW_SIZE", "60"))
+
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+
+
+# Atomic Redis sliding-window rate limiter.
+# Returns:
+# [1, 0, current_count] if allowed
+# [0, retry_after_seconds, current_count] if blocked
+RATE_LIMIT_SCRIPT = """
+local key = KEYS[1]
+local now = tonumber(ARGV[1])
+local window = tonumber(ARGV[2])
+local member = ARGV[3]
+local limit = tonumber(ARGV[4])
+
+redis.call(
+    'ZREMRANGEBYSCORE',
+    key,
+    '-inf',
+    now - window
+)
+
+local count = redis.call('ZCARD', key)
+
+if count >= limit then
+    local oldest = redis.call(
+        'ZRANGE',
+        key,
+        0,
+        0,
+        'WITHSCORES'
+    )
+
+    local retry_after = math.ceil(
+        (tonumber(oldest[2]) + window - now) / 1000
+    )
+
+    return {0, retry_after, count}
+end
+
+redis.call('ZADD', key, now, member)
+redis.call('PEXPIRE', key, window + 5000)
+
+count = count + 1
+
+return {1, 0, count}
+"""
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Create one shared Redis connection pool per application process.
+    app.state.redis = Redis.from_url(
+        REDIS_URL,
+        decode_responses=True,
+    )
+
+    # Verify Redis is available before accepting requests.
+    await app.state.redis.ping()
+
+    logger.info("Redis connection established")
+
+    try:
+        yield
+    finally:
+        await app.state.redis.aclose()
+        logger.info("Redis connection closed")
+
+
+app = FastAPI(
+    title="RAG PDF API",
+    lifespan=lifespan,
+)
 
 
 # CORS Configuration
@@ -20,20 +108,6 @@ ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:8080",
 ]
-
-
-# Rate Limiting Configuration
-RATE_LIMIT = 10000
-WINDOW_SIZE = 60
-
-CLIENT_TTL = 3600
-CLEANUP_INTERVAL = 300
-
-
-# Stores timestamps for every client
-request_timestamps = {}
-
-last_cleanup_time = time.monotonic()
 
 
 # Paths exempted from rate limiting
@@ -45,8 +119,6 @@ EXEMPT_PATHS = {
 
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
-
-    global last_cleanup_time
 
     # Skip CORS preflight requests
     if request.method == "OPTIONS":
@@ -60,51 +132,42 @@ async def rate_limit_middleware(request: Request, call_next):
     client = request.client
     client_ip = client.host if client else "unknown"
 
-    current_time = time.monotonic()
+    # Use wall-clock time because Redis is shared across processes.
+    current_time_ms = int(time.time() * 1000)
 
-    # Periodic cleanup of inactive clients
-    if current_time - last_cleanup_time >= CLEANUP_INTERVAL:
+    window_ms = WINDOW_SIZE * 1000
 
-        expired_clients = [
-            ip
-            for ip, data in request_timestamps.items()
-            if current_time - data["last_seen"] >= CLIENT_TTL
-        ]
+    # Separate sorted set for each client.
+    redis_key = f"rate_limit:{client_ip}"
 
-        for ip in expired_clients:
-            del request_timestamps[ip]
-
-        last_cleanup_time = current_time
-
-    # Initialize client if seeing it for the first time
-    if client_ip not in request_timestamps:
-
-        request_timestamps[client_ip] = {
-            "timestamps": deque(),
-            "last_seen": current_time
-        }
-
-    client_data = request_timestamps[client_ip]
-
-    # Update last activity time
-    client_data["last_seen"] = current_time
-
-    timestamps = client_data["timestamps"]
-
-    # Calculate rolling window boundary
-    window_start = current_time - WINDOW_SIZE
-
-    # Remove timestamps outside the rolling window
-    while timestamps and timestamps[0] <= window_start:
-        timestamps.popleft()
-
-    # Check rate limit
-    if len(timestamps) >= RATE_LIMIT:
-
-        retry_after = math.ceil(
-            timestamps[0] + WINDOW_SIZE - current_time
+    try:
+        result = await request.app.state.redis.eval(
+            RATE_LIMIT_SCRIPT,
+            1,
+            redis_key,
+            current_time_ms,
+            window_ms,
+            str(uuid.uuid4()),
+            RATE_LIMIT,
         )
 
+    except RedisError:
+        logger.exception("Redis rate limiter unavailable")
+
+        return JSONResponse(
+            status_code=503,
+            content={
+                "detail": "Rate limiting service temporarily unavailable."
+            },
+        )
+
+    allowed = int(result[0])
+    retry_after = int(result[1])
+    request_count = int(result[2])
+
+    remaining = max(0, RATE_LIMIT - request_count)
+
+    if not allowed:
         return JSONResponse(
             status_code=429,
             content={
@@ -113,31 +176,19 @@ async def rate_limit_middleware(request: Request, call_next):
             headers={
                 "Retry-After": str(retry_after),
                 "X-RateLimit-Limit": str(RATE_LIMIT),
-                "X-RateLimit-Remaining": "0"
-            }
+                "X-RateLimit-Remaining": "0",
+            },
         )
-
-    # Allow request and record its timestamp
-    timestamps.append(current_time)
 
     response = await call_next(request)
 
-    # Calculate remaining requests
-    remaining_requests = max(
-        0,
-        RATE_LIMIT - len(timestamps)
-    )
-
-    # Add rate limit headers
     response.headers["X-RateLimit-Limit"] = str(RATE_LIMIT)
+    response.headers["X-RateLimit-Remaining"] = str(remaining)
 
-    response.headers["X-RateLimit-Remaining"] = str(
-        remaining_requests
-    )
     return response
 
 
-# Initialize application
+# Initialize application state
 initialize_app(app)
 
 

@@ -35,3 +35,9 @@ uuid
 #jwt
 PyJWT
 pwdlib[argon2]
+
+#load testing
+locust>=2.32,<3
+
+#redis cache
+redis>=5.0,<6
