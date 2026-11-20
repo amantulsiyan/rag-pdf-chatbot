@@ -3,25 +3,14 @@ import os
 import logging
 import psycopg2
 from dotenv import load_dotenv
+from api.database import get_db_connection
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
 
-def get_db_connection():
-    db_password = os.getenv("DB_PASSWORD")
 
-    if not db_password:
-        raise RuntimeError("DB_PASSWORD is missing from .env")
-
-    return psycopg2.connect(
-        dbname=os.getenv("DB_NAME", "rag_db"),
-        user=os.getenv("DB_USER", "postgres"),
-        host=os.getenv("DB_HOST", "localhost"),
-        port=os.getenv("DB_PORT", "5432"),
-        password=db_password,
-    )
 
 
 def init_logging_tables():

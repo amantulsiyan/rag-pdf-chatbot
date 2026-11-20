@@ -3,12 +3,11 @@ import time
 import uuid
 import threading
 
-import psycopg2
-from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException, Request, Depends
 from starlette.concurrency import run_in_threadpool
 
 from api.dependencies import get_current_user
+from api.database import get_db_connection
 from api.models import AskResponse, QuestionRequest
 from chunking.chunker import chunk_text
 from loaders.loader import load_pdf
@@ -31,26 +30,11 @@ from logger.logger import (
 )
 
 
-load_dotenv()
 router = APIRouter()
 
 # Prevent two simultaneous first-time requests from building the same
 # document's FAISS/BM25 indexes more than once in this process.
 _INDEX_CACHE_LOCK = threading.Lock()
-
-
-def get_db_connection():
-    db_password = os.getenv("DB_PASSWORD")
-    if not db_password:
-        raise RuntimeError("DB_PASSWORD is missing from .env")
-
-    return psycopg2.connect(
-        dbname=os.getenv("DB_NAME", "rag_db"),
-        user=os.getenv("DB_USER", "postgres"),
-        password=db_password,
-        host=os.getenv("DB_HOST", "localhost"),
-        port=os.getenv("DB_PORT", "5432"),
-    )
 
 
 def get_owned_document(document_id, user_id):

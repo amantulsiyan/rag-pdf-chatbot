@@ -4,8 +4,6 @@ import uuid
 from uuid import UUID
 import shutil
 import logging
-import psycopg2
-from dotenv import load_dotenv
 from fastapi import (
     APIRouter,
     File,
@@ -15,6 +13,7 @@ from fastapi import (
     Depends,
 )
 from api.dependencies import get_current_user
+from api.database import get_db_connection
 from chunking.chunker import chunk_text
 from loaders.loader import load_pdf
 from embeddings.embedder import embed_chunks
@@ -22,26 +21,10 @@ from vectorstore.faiss_store import build_faiss_index
 from retrieval.bm25_store import build_bm25_index
 
 
-load_dotenv()
-
 router = APIRouter()
 upload_folder = "temp_uploads"
 os.makedirs(upload_folder, exist_ok=True)
 logger = logging.getLogger(__name__)
-
-def get_db_connection():
-    db_password = os.getenv("DB_PASSWORD")
-    if not db_password:
-        raise RuntimeError("DB_PASSWORD is missing from .env")
-
-    return psycopg2.connect(
-        dbname=os.getenv("DB_NAME", "rag_db"),
-        user=os.getenv("DB_USER", "postgres"),
-        host=os.getenv("DB_HOST", "localhost"),
-        port=os.getenv("DB_PORT", "5432"),
-        password=db_password,
-    )
-
 
 @router.post("/upload_pdf", status_code=201)
 async def upload_file(

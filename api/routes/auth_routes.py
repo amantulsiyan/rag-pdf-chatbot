@@ -1,8 +1,7 @@
-import os
 import psycopg2
-from dotenv import load_dotenv
 from fastapi import status, APIRouter, HTTPException, Depends
 from api.dependencies import get_current_user
+from api.database import get_db_connection
 from fastapi.security import OAuth2PasswordRequestForm
 
 from api.auth import (
@@ -11,20 +10,7 @@ from api.auth import (
     create_access_token
 )
 from api.models import RegisterRequest
-load_dotenv()
 router = APIRouter(tags = ['Authentication'])
-
-def get_db_connection():
-    db_password= os.getenv("DB_PASSWORD")
-    if not db_password:
-        raise RuntimeError("DB_PASSWORD is missing from .env")
-    return psycopg2.connect(
-        dbname=os.getenv("DB_NAME", "rag_db"),
-        user=os.getenv("DB_USER", "postgres"),
-        host=os.getenv("DB_HOST", "localhost"),
-        port=os.getenv("DB_PORT", "5432"),
-        password = db_password,
-    )
 
 
 @router.get("/me")
