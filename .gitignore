@@ -1,5 +1,6 @@
 # Virtual environments
 venv/
+.venv*/
 .env/
 
 # Python
@@ -19,6 +20,9 @@ data/
 .env
 
 temp_uploads/
+
+# PDF test files
+*.pdf
 
 # Test results
 test_results/
