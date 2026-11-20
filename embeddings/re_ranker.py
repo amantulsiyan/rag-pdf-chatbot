@@ -1,10 +1,19 @@
 from sentence_transformers import CrossEncoder
 import numpy as np
 _model=None
+import torch
 def _get_model():
     global _model
+
     if _model is None:
-        _model=CrossEncoder("BAAI/bge-reranker-base")
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        _model = CrossEncoder(
+            "BAAI/bge-reranker-base",
+            device=device
+        )
+
+        print("Reranker device:", next(_model.model.parameters()).device)
+
     return _model
 def reranker(query, hits, actual_top_k):
     model=_get_model()

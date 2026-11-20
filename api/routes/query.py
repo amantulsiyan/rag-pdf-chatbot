@@ -1,11 +1,12 @@
-
 import os
 import time
 import uuid
+import threading
 
 import psycopg2
 from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException, Request, Depends
+from starlette.concurrency import run_in_threadpool
 
 from api.dependencies import get_current_user
 from api.models import AskResponse, QuestionRequest
@@ -33,6 +34,10 @@ from logger.logger import (
 load_dotenv()
 router = APIRouter()
 
+# Prevent two simultaneous first-time requests from building the same
+# document's FAISS/BM25 indexes more than once in this process.
+_INDEX_CACHE_LOCK = threading.Lock()
+
 
 def get_db_connection():
     db_password = os.getenv("DB_PASSWORD")
@@ -40,11 +45,11 @@ def get_db_connection():
         raise RuntimeError("DB_PASSWORD is missing from .env")
 
     return psycopg2.connect(
-        dbname="rag_db",
-        user="postgres",
+        dbname=os.getenv("DB_NAME", "rag_db"),
+        user=os.getenv("DB_USER", "postgres"),
         password=db_password,
-        host="localhost",
-        port="5432",
+        host=os.getenv("DB_HOST", "localhost"),
+        port=os.getenv("DB_PORT", "5432"),
     )
 
 
@@ -68,72 +73,73 @@ def get_owned_document(document_id, user_id):
 
 def get_document_indexes(request, document_id, storage_path, user_id):
     cache_key = str(document_id)
-    cached = request.app.state.document_indexes.get(cache_key)
 
-    if cached is not None:
-        # Defense in depth: verify cached ownership too.
-        if cached["owner_user_id"] != str(user_id):
+    # Lock around cache check + build to avoid duplicate concurrent builds.
+    with _INDEX_CACHE_LOCK:
+        cached = request.app.state.document_indexes.get(cache_key)
+
+        if cached is not None:
+            # Defense in depth: verify cached ownership too.
+            if cached["owner_user_id"] != str(user_id):
+                raise HTTPException(
+                    status_code=404,
+                    detail="Document not found",
+                )
+            return cached
+
+        if not os.path.isfile(storage_path):
             raise HTTPException(
-                status_code=404,
-                detail="Document not found",
+                status_code=500,
+                detail="Stored PDF is missing",
             )
+
+        text, _page_metadata = load_pdf(storage_path)
+
+        if not text or not text.strip():
+            raise HTTPException(
+                status_code=500,
+                detail="Could not extract text from stored PDF",
+            )
+
+        chunks, _ = chunk_text(
+            text,
+            document_id=cache_key,
+        )
+
+        if not chunks:
+            raise HTTPException(
+                status_code=500,
+                detail="Could not rebuild document chunks",
+            )
+
+        vectors = embed_chunks(chunks)
+        faiss_index = build_faiss_index(vectors)
+        bm25_index, tokenised_corpus = build_bm25_index(chunks)
+
+        cached = {
+            "owner_user_id": str(user_id),
+            "chunks": chunks,
+            "faiss_index": faiss_index,
+            "bm25_index": bm25_index,
+            "tokenised_corpus": tokenised_corpus,
+        }
+
+        request.app.state.document_indexes[cache_key] = cached
         return cached
 
-    if not os.path.isfile(storage_path):
-        raise HTTPException(
-            status_code=500,
-            detail="Stored PDF is missing",
-        )
 
-    text, page_metadata = load_pdf(storage_path)
+def _execute_query_sync(request, question_req, current_user):
+    """Run the blocking database, retrieval, model and logging work off-loop."""
+    request_id = uuid.uuid4()
+    start_time = time.perf_counter()
 
-    if not text or not text.strip():
-        raise HTTPException(
-            status_code=500,
-            detail="Could not extract text from stored PDF",
-        )
-
-    chunks, _ = chunk_text(
-        text,
-        document_id=cache_key,
-    )
-
-    if not chunks:
-        raise HTTPException(
-            status_code=500,
-            detail="Could not rebuild document chunks",
-        )
-
-    vectors = embed_chunks(chunks)
-    faiss_index = build_faiss_index(vectors)
-    bm25_index, tokenised_corpus = build_bm25_index(chunks)
-
-    cached = {
-        "owner_user_id": str(user_id),
-        "chunks": chunks,
-        "faiss_index": faiss_index,
-        "bm25_index": bm25_index,
-        "tokenised_corpus": tokenised_corpus,
-    }
-
-    request.app.state.document_indexes[cache_key] = cached
-    return cached
-
-
-@router.post("/ask_query", response_model=AskResponse)
-async def ask_question(
-    request: Request,
-    question_req: QuestionRequest,
-    current_user: dict = Depends(get_current_user),
-):
-    # Check ownership before accessing the PDF or its indexes.
+    # psycopg2 is synchronous, so this lookup must run in the worker thread.
     document = get_owned_document(
         question_req.document_id,
         current_user["id"],
     )
 
     if document is None:
-        # Do not reveal whether another user's document exists.
         raise HTTPException(
             status_code=404,
             detail="Document not found",
@@ -155,8 +161,6 @@ async def ask_question(
     )
 
     timings = {}
-    request_id = uuid.uuid4()
-    start_time = time.time()
     llm_client = request.app.state.llm
 
     rewritten_query, timings["query_rewriting_ms"] = timed_step(
@@ -206,6 +210,7 @@ async def ask_question(
             actual_top_k=request.app.state.reranked_k_chunks,
         )
     except Exception as exc:
+        # Preserve the existing fallback if cross-encoder inference fails.
         print(f"Reranking failed: {exc}; using hybrid results")
         reranked_chunks = retrieved_chunks[
             :request.app.state.reranked_k_chunks
@@ -220,10 +225,11 @@ async def ask_question(
         llm_client=llm_client,
     )
 
-    total_ms = (time.time() - start_time) * 1000
+    total_ms = (time.perf_counter() - start_time) * 1000
     timings["total_ms"] = total_ms
     result["latency_breakdown"] = timings
 
+    # Logging uses synchronous psycopg2 too; keep it off the event loop.
     log_query(
         str(request_id),
         str(current_user["id"]),
@@ -237,3 +243,19 @@ async def ask_question(
     log_retrievals(str(request_id), retrieved_chunks, reranked_chunks)
 
     return result
+
+
+@router.post("/ask_query", response_model=AskResponse)
+async def ask_question(
+    request: Request,
+    question_req: QuestionRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    # All blocking work (psycopg2, PDF/index operations, model inference,
+    # synchronous Groq calls and DB logging) runs in a worker thread.
+    return await run_in_threadpool(
+        _execute_query_sync,
+        request,
+        question_req,
+        current_user,
+    )

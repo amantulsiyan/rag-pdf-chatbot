@@ -35,11 +35,11 @@ def get_db_connection():
         raise RuntimeError("DB_PASSWORD is missing from .env")
 
     return psycopg2.connect(
-        dbname="rag_db",
-        user="postgres",
+        dbname=os.getenv("DB_NAME", "rag_db"),
+        user=os.getenv("DB_USER", "postgres"),
+        host=os.getenv("DB_HOST", "localhost"),
+        port=os.getenv("DB_PORT", "5432"),
         password=db_password,
-        host="localhost",
-        port="5432",
     )
 
 
