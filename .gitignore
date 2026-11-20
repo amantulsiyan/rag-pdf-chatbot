@@ -24,3 +24,6 @@ temp_uploads/
 test_results/
 *.json
 *.txt
+
+# PgBouncer userlist contains plaintext credentials
+docker/pgbouncer/userlist.txt
